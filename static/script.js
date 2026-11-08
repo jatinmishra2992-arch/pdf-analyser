@@ -1,0 +1,122 @@
+const $ = (id) => document.getElementById(id);
+const show = (el, yes) => el.classList.toggle("hidden", !yes);
+let currentFileId = null;
+
+function showError(msg) {
+  $("error").textContent = msg;
+  show($("error"), true);
+  $("error").scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function esc(s) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function renderSummary(text) {
+  let html = "";
+  let inList = false;
+  for (const raw of text.split("\n")) {
+    const line = raw.trim();
+    const isBullet = line.startsWith("- ");
+    if (inList && !isBullet) { html += "</ul>"; inList = false; }
+    if (!line) continue;
+    if (line.startsWith("## ")) html += "<h4>" + esc(line.slice(3)) + "</h4>";
+    else if (line.startsWith("# ")) html += "<h3>" + esc(line.slice(2)) + "</h3>";
+    else if (isBullet) {
+      if (!inList) { html += "<ul>"; inList = true; }
+      html += "<li>" + esc(line.slice(2)) + "</li>";
+    }
+    else if (line.startsWith("[Diagram")) html += '<p class="diagram-note">' + esc(line) + "</p>";
+    else html += "<p>" + esc(line) + "</p>";
+  }
+  if (inList) html += "</ul>";
+  return html;
+}
+
+$("pdfInput").addEventListener("change", () => {
+  const file = $("pdfInput").files[0];
+  if (!file) return;
+
+  show($("error"), false);
+  show($("info"), false);
+  show($("resultCard"), false);
+  currentFileId = null;
+
+  if (!file.name.toLowerCase().endsWith(".pdf")) {
+    return showError("Please choose a PDF file.");
+  }
+
+  $("preview").src = URL.createObjectURL(file);
+  show($("previewCard"), true);
+
+  const form = new FormData();
+  form.append("pdf", file);
+
+  const xhr = new XMLHttpRequest();
+  xhr.open("POST", "/upload");
+
+  xhr.upload.onprogress = (e) => {
+    if (!e.lengthComputable) return;
+    const pct = Math.round((e.loaded / e.total) * 100);
+    $("bar").style.width = pct + "%";
+    $("progressText").textContent =
+      pct < 100 ? "Uploading... " + pct + "%" : "Reading your PDF...";
+  };
+
+  xhr.onload = () => {
+    show($("progressBox"), false);
+    let data = {};
+    try { data = JSON.parse(xhr.responseText); } catch (e) {}
+    if (xhr.status !== 200) return showError(data.error || "Upload failed.");
+
+    currentFileId = data.file_id;
+    $("fileName").textContent = data.name;
+    $("pageCount").textContent = data.pages;
+    show($("scanNote"), data.is_scanned);
+    show($("info"), true);
+  };
+
+  xhr.onerror = () => {
+    show($("progressBox"), false);
+    showError("Could not reach the server.");
+  };
+
+  $("bar").style.width = "0%";
+  show($("progressBox"), true);
+  xhr.send(form);
+});
+
+$("detailBtn").addEventListener("click", async () => {
+  if (!currentFileId) return;
+  show($("error"), false);
+  show($("resultCard"), false);
+  $("detailBtn").disabled = true;
+  show($("aiBusy"), true);
+
+  let secs = 0;
+  const timer = setInterval(() => {
+    secs++;
+    $("aiBusyText").textContent =
+      "AI is reading your PDF... " + secs + "s (this can take 1-2 minutes)";
+  }, 1000);
+
+  try {
+    const res = await fetch("/summarize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ file_id: currentFileId }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Something went wrong.");
+
+    $("summaryBox").innerHTML = renderSummary(data.summary);
+    show($("resultCard"), true);
+    $("resultCard").scrollIntoView({ behavior: "smooth" });
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    clearInterval(timer);
+    show($("aiBusy"), false);
+    $("detailBtn").disabled = false;
+  }
+});

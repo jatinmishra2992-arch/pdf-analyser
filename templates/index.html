@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Smart PDF Analyzer</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <span class="logo">📘</span>
+    <div>
+      <h1>Smart PDF Analyzer</h1>
+      <p>AI Notes Generator</p>
+    </div>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>1. Upload your PDF</h2>
+      <label class="drop" for="pdfInput">
+        <span>Click here to choose a PDF</span>
+        <input type="file" id="pdfInput" accept="application/pdf" hidden>
+      </label>
+
+      <div id="progressBox" class="hidden">
+        <div class="bar"><div id="bar"></div></div>
+        <p id="progressText">Uploading...</p>
+      </div>
+
+      <p id="error" class="error hidden"></p>
+
+      <div id="info" class="hidden">
+        <p><b>File:</b> <span id="fileName"></span></p>
+        <p><b>Pages:</b> <span id="pageCount"></span></p>
+        <p id="scanNote" class="note hidden">
+          This looks like a scanned PDF. The AI can still read it.
+        </p>
+        <button id="detailBtn" class="btn">Detailed Summary</button>
+      </div>
+
+      <div id="aiBusy" class="busy hidden">
+        <div class="spinner"></div>
+        <p id="aiBusyText">AI is reading your PDF...</p>
+      </div>
+    </section>
+
+    <section class="card hidden" id="resultCard">
+      <h2>2. Detailed Summary</h2>
+      <div id="summaryBox" class="summary"></div>
+    </section>
+
+    <section class="card hidden" id="previewCard">
+      <h2>PDF Preview</h2>
+      <iframe id="preview" title="PDF preview"></iframe>
+    </section>
+  </main>
+
+  <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
