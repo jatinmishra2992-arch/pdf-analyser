@@ -85,7 +85,6 @@ $("pdfInput").addEventListener("change", () => {
   show($("progressBox"), true);
   xhr.send(form);
 });
-
 $("detailBtn").addEventListener("click", async () => {
   if (!currentFileId) return;
   show($("error"), false);
@@ -97,8 +96,10 @@ $("detailBtn").addEventListener("click", async () => {
   const timer = setInterval(() => {
     secs++;
     $("aiBusyText").textContent =
-      "AI is reading your PDF... " + secs + "s (this can take 1-2 minutes)";
+      "AI is reading your PDF... " + secs + "s (this can take a few minutes)";
   }, 1000);
+
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   try {
     const res = await fetch("/summarize", {
@@ -106,12 +107,31 @@ $("detailBtn").addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ file_id: currentFileId }),
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Something went wrong.");
+    const start = await res.json().catch(() => ({}));
+    if (!res.ok || !start.job_id) {
+      throw new Error(start.error || "Could not start. Upload your PDF again.");
+    }
 
-    $("summaryBox").innerHTML = renderSummary(data.summary);
-    show($("resultCard"), true);
-    $("resultCard").scrollIntoView({ behavior: "smooth" });
+    let finished = false;
+    for (let i = 0; i < 150 && !finished; i++) {
+      await wait(3000);
+      let job = {};
+      try {
+        const r = await fetch("/status/" + start.job_id);
+        job = await r.json();
+      } catch (e) {
+        continue; // the server may be waking up, keep trying
+      }
+      if (job.status === "done") {
+        $("summaryBox").innerHTML = renderSummary(job.summary);
+        show($("resultCard"), true);
+        $("resultCard").scrollIntoView({ behavior: "smooth" });
+        finished = true;
+      } else if (job.status === "error") {
+        throw new Error(job.error || "Something went wrong.");
+      }
+    }
+    if (!finished) throw new Error("It took too long. Please try again.");
   } catch (e) {
     showError(e.message);
   } finally {
