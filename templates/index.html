@@ -4,57 +4,98 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Smart PDF Analyzer</title>
+  <meta name="description" content="Turn long educational PDFs into notes you can study from.">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <header>
-    <span class="logo">📘</span>
-    <div>
-      <h1>Smart PDF Analyzer</h1>
-      <p>AI Notes Generator</p>
-    </div>
-  </header>
+  <div class="page">
 
-  <main>
-    <section class="card">
-      <h2>1. Upload your PDF</h2>
-      <label class="drop" for="pdfInput">
-        <span>Click here to choose a PDF</span>
-        <input type="file" id="pdfInput" accept="application/pdf" hidden>
-      </label>
+    <header class="top">
+      <span class="wordmark">Smart PDF Analyzer</span>
+      <a class="toplink" href="https://github.com/jatinmishra2992-arch/pdf-analyser"
+         target="_blank" rel="noopener">Source on GitHub</a>
+    </header>
 
-      <div id="progressBox" class="hidden">
-        <div class="bar"><div id="bar"></div></div>
-        <p id="progressText">Uploading...</p>
-      </div>
-
-      <p id="error" class="error hidden"></p>
-
-      <div id="info" class="hidden">
-        <p><b>File:</b> <span id="fileName"></span></p>
-        <p><b>Pages:</b> <span id="pageCount"></span></p>
-        <p id="scanNote" class="note hidden">
-          This looks like a scanned PDF. The AI can still read it.
-        </p>
-        <button id="detailBtn" class="btn">Detailed Summary</button>
-      </div>
-
-      <div id="aiBusy" class="busy hidden">
-        <div class="spinner"></div>
-        <p id="aiBusyText">AI is reading your PDF...</p>
-      </div>
+    <section class="intro">
+      <h1>Long PDFs, boiled down to <mark>notes you can study from</mark>.</h1>
+      <p>Choose a PDF, wait a minute or two, and get notes organised under
+         headings, with the key points kept.</p>
     </section>
 
-    <section class="card hidden" id="resultCard">
-      <h2>2. Detailed Summary</h2>
-      <div id="summaryBox" class="summary"></div>
+    <main>
+      <section class="panel">
+        <p class="step">Step 1</p>
+        <h2>Choose your PDF</h2>
+
+        <label class="drop" for="pdfInput">
+          <span class="drop-title">Choose a PDF from your computer</span>
+          <span class="drop-hint">Up to 32 MB and 100 pages. Scanned PDFs work too.</span>
+          <input type="file" id="pdfInput" accept="application/pdf" hidden>
+        </label>
+
+        <div id="progressBox" class="hidden">
+          <div class="bar"><div id="bar"></div></div>
+          <p id="progressText">Uploading...</p>
+        </div>
+
+        <p id="error" class="error hidden"></p>
+
+        <div id="info" class="hidden">
+          <dl class="facts">
+            <div><dt>File</dt><dd id="fileName"></dd></div>
+            <div><dt>Pages</dt><dd id="pageCount"></dd></div>
+          </dl>
+          <p id="scanNote" class="note hidden">
+            This looks like a scanned PDF. The AI can still read it.
+          </p>
+          <button id="detailBtn" class="btn">Make my notes</button>
+        </div>
+
+        <div id="aiBusy" class="busy hidden">
+          <div class="spinner"></div>
+          <p id="aiBusyText">AI is reading your PDF...</p>
+        </div>
+      </section>
+
+      <section class="panel hidden" id="resultCard">
+        <p class="step">Step 2</p>
+        <h2>Your notes</h2>
+        <div id="summaryBox" class="summary"></div>
+      </section>
+
+      <section class="panel hidden" id="previewCard">
+        <p class="step">For reference</p>
+        <h2>The original PDF</h2>
+        <iframe id="preview" title="PDF preview"></iframe>
+      </section>
+    </main>
+
+    <section class="how">
+      <h2>How it works</h2>
+      <ol>
+        <li>Your PDF is split into parts of about ten pages, so long files don't time out.</li>
+        <li>Each part is read by the Gemini AI model, which writes notes in the same order as the original.</li>
+        <li>The parts are joined into one set of notes, with a marker wherever a diagram appears.</li>
+      </ol>
     </section>
 
-    <section class="card hidden" id="previewCard">
-      <h2>PDF Preview</h2>
-      <iframe id="preview" title="PDF preview"></iframe>
+    <section class="good">
+      <h2>Good to know</h2>
+      <ul>
+        <li>The first visit can take about a minute, because the free server sleeps when nobody is using it.</li>
+        <li>Long PDFs can take a few minutes. The page shows which part is being read.</li>
+        <li>Your PDF is sent to Google's Gemini API to be read, so please don't upload private documents.</li>
+        <li>Diagrams are marked in the notes, but they are not copied into them yet.</li>
+      </ul>
     </section>
-  </main>
+
+    <footer>
+      Made by Jatin · Python, Flask and the Gemini API ·
+      <a href="https://github.com/jatinmishra2992-arch/pdf-analyser"
+         target="_blank" rel="noopener">Code on GitHub</a>
+    </footer>
+
+  </div>
 
   <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
