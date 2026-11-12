@@ -18,7 +18,7 @@ UPLOADS.mkdir(exist_ok=True)
 OUTPUTS.mkdir(exist_ok=True)
 
 MAX_PAGES = 100
-JOBS = {}  # job_id -> {"status": ..., "summary": ..., "error": ...}
+JOBS = {}  # job_id -> {"status": ..., "note": ..., "summary": ..., "error": ...}
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 32 * 1024 * 1024  # 32 MB
@@ -50,8 +50,11 @@ def upload():
 
 
 def run_job(job_id, file_id, path):
+    def note(msg):
+        JOBS[job_id]["note"] = msg
+
     try:
-        text = make_detailed_summary(path)
+        text = make_detailed_summary(path, progress=note)
         (OUTPUTS / f"{file_id}_detailed.txt").write_text(text, encoding="utf-8")
         JOBS[job_id] = {"status": "done", "summary": text}
     except Exception as e:
@@ -60,20 +63,24 @@ def run_job(job_id, file_id, path):
 
 @app.route("/summarize", methods=["POST"])
 def summarize():
-    body = request.get_json(silent=True) or {}
-    file_id = str(body.get("file_id", ""))
-    path = UPLOADS / f"{file_id}.pdf"
-    if not file_id.isalnum() or not path.exists():
-        return jsonify(error="Please upload your PDF again."), 400
+    file = request.files.get("pdf")
+    if not file:
+        return jsonify(error="Please choose your PDF first."), 400
 
-    info = get_pdf_info(path)
+    file_id = uuid.uuid4().hex
+    path = UPLOADS / f"{file_id}.pdf"
+    file.save(path)
+    try:
+        info = get_pdf_info(path)
+    except Exception as e:
+        return jsonify(error=f"Could not read this PDF: {e}"), 400
     if info["pages"] > MAX_PAGES:
         return jsonify(
             error=f"This PDF has {info['pages']} pages. Right now the limit "
                   f"is {MAX_PAGES} pages."), 400
 
     job_id = uuid.uuid4().hex
-    JOBS[job_id] = {"status": "working"}
+    JOBS[job_id] = {"status": "working", "note": "Starting..."}
     threading.Thread(target=run_job, args=(job_id, file_id, path),
                      daemon=True).start()
     return jsonify(job_id=job_id)
@@ -84,8 +91,7 @@ def status(job_id):
     job = JOBS.get(job_id)
     if not job:
         return jsonify(status="error",
-                       error="The server restarted. Please upload your PDF "
-                             "again and retry."), 404
+                       error="The server restarted. Please try again."), 404
     return jsonify(job)
 
 
