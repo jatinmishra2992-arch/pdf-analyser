@@ -1,6 +1,5 @@
 const $ = (id) => document.getElementById(id);
 const show = (el, yes) => el.classList.toggle("hidden", !yes);
-let currentFileId = null;
 
 function showError(msg) {
   $("error").textContent = msg;
@@ -10,6 +9,24 @@ function showError(msg) {
 
 function esc(s) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function formatSize(bytes) {
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " MB";
+  return Math.max(1, Math.round(bytes / 1024)) + " KB";
+}
+
+function resetStats() {
+  ["statPages", "statSize", "statType", "statParts"].forEach((id) => {
+    $(id).textContent = "–";
+  });
+}
+
+function setStats(file, data) {
+  $("statPages").textContent = data.pages;
+  $("statSize").textContent = formatSize(file.size);
+  $("statType").textContent = data.is_scanned ? "Scanned" : "Text";
+  $("statParts").textContent = Math.max(1, Math.ceil(data.pages / 10));
 }
 
 function renderSummary(text) {
@@ -26,7 +43,8 @@ function renderSummary(text) {
       if (!inList) { html += "<ul>"; inList = true; }
       html += "<li>" + esc(line.slice(2)) + "</li>";
     }
-    else if (line.startsWith("[Diagram")) html += '<p class="diagram-note">' + esc(line) + "</p>";
+    else if (line.startsWith("[Diagram") || line.startsWith("[Pages"))
+      html += '<p class="diagram-note">' + esc(line) + "</p>";
     else html += "<p>" + esc(line) + "</p>";
   }
   if (inList) html += "</ul>";
@@ -40,7 +58,7 @@ $("pdfInput").addEventListener("change", () => {
   show($("error"), false);
   show($("info"), false);
   show($("resultCard"), false);
-  currentFileId = null;
+  resetStats();
 
   if (!file.name.toLowerCase().endsWith(".pdf")) {
     return showError("Please choose a PDF file.");
@@ -69,11 +87,11 @@ $("pdfInput").addEventListener("change", () => {
     try { data = JSON.parse(xhr.responseText); } catch (e) {}
     if (xhr.status !== 200) return showError(data.error || "Upload failed.");
 
-    currentFileId = data.file_id;
     $("fileName").textContent = data.name;
     $("pageCount").textContent = data.pages;
     show($("scanNote"), data.is_scanned);
     show($("info"), true);
+    setStats(file, data);
   };
 
   xhr.onerror = () => {
@@ -85,35 +103,36 @@ $("pdfInput").addEventListener("change", () => {
   show($("progressBox"), true);
   xhr.send(form);
 });
+
 $("detailBtn").addEventListener("click", async () => {
-  if (!currentFileId) return;
+  const file = $("pdfInput").files[0];
+  if (!file) return showError("Please choose a PDF first.");
+
   show($("error"), false);
   show($("resultCard"), false);
   $("detailBtn").disabled = true;
   show($("aiBusy"), true);
 
   let secs = 0;
+  let note = "Sending your PDF...";
   const timer = setInterval(() => {
     secs++;
-    $("aiBusyText").textContent =
-      "AI is reading your PDF... " + secs + "s (this can take a few minutes)";
+    $("aiBusyText").textContent = note + " (" + secs + "s)";
   }, 1000);
 
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
   try {
-    const res = await fetch("/summarize", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ file_id: currentFileId }),
-    });
+    const form = new FormData();
+    form.append("pdf", file);
+    const res = await fetch("/summarize", { method: "POST", body: form });
     const start = await res.json().catch(() => ({}));
     if (!res.ok || !start.job_id) {
-      throw new Error(start.error || "Could not start. Upload your PDF again.");
+      throw new Error(start.error || "Could not start. Please try again.");
     }
 
     let finished = false;
-    for (let i = 0; i < 150 && !finished; i++) {
+    for (let i = 0; i < 200 && !finished; i++) {
       await wait(3000);
       let job = {};
       try {
@@ -122,6 +141,7 @@ $("detailBtn").addEventListener("click", async () => {
       } catch (e) {
         continue; // the server may be waking up, keep trying
       }
+      if (job.note) note = job.note;
       if (job.status === "done") {
         $("summaryBox").innerHTML = renderSummary(job.summary);
         show($("resultCard"), true);
